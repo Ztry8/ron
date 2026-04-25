@@ -1,7 +1,7 @@
 use ron;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 struct RangeTest {
     a: std::ops::Range<i32>,
     b: std::ops::RangeInclusive<i32>,
@@ -10,6 +10,15 @@ struct RangeTest {
 
 #[test]
 fn test_ranges() {
+    let ranges = RangeTest {
+        a: 0..5,
+        b: 1..=3,
+        c: 0.6..4.3,
+    };
+
+    let ser = ron::to_string(&ranges).unwrap();
+    dbg!(ser);
+
     let de: RangeTest = ron::from_str(
         r#"
         (

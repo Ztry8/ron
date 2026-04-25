@@ -1050,6 +1050,12 @@ impl<'a, W: fmt::Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         let old_newtype_variant = self.newtype_variant;
+        if len == 2 && name.starts_with("Range") {
+            self.newtype_variant = false;
+            self.implicit_some_depth = 0;
+            return Ok(Compound::new_range(self));
+        }
+
         self.newtype_variant = false;
         self.implicit_some_depth = 0;
 
@@ -1106,6 +1112,7 @@ pub struct Compound<'a, W: fmt::Write> {
     state: State,
     newtype_variant: bool,
     sequence_index: usize,
+    range_mode: bool,
 }
 
 impl<'a, W: fmt::Write> Compound<'a, W> {
@@ -1115,6 +1122,17 @@ impl<'a, W: fmt::Write> Compound<'a, W> {
             state: State::First,
             newtype_variant,
             sequence_index: 0,
+            range_mode: false,
+        }
+    }
+
+    fn new_range(ser: &'a mut Serializer<W>) -> Self {
+        Compound {
+            ser,
+            state: State::First,
+            newtype_variant: false,
+            sequence_index: 0,
+            range_mode: true,
         }
     }
 }
@@ -1340,6 +1358,15 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
     where
         T: ?Sized + Serialize,
     {
+        if self.range_mode {
+            if key == "end" {
+                self.ser.output.write_str("..")?;
+            }
+
+            guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
+            return Ok(());
+        }
+
         let mut restore_field = self.ser.pretty.as_mut().and_then(|(config, _)| {
             config.path_meta.take().map(|mut field| {
                 if let Some(fields) = field.fields_mut() {
@@ -1403,6 +1430,10 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
     }
 
     fn end(self) -> Result<()> {
+        if self.range_mode {
+            return Ok(());
+        }
+
         if let State::Rest = self.state {
             if let Some((ref config, ref pretty)) = self.ser.pretty {
                 if pretty.indent <= config.depth_limit && !config.compact_structs {
