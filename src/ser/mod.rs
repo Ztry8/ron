@@ -1132,7 +1132,7 @@ impl<'a, W: fmt::Write> Compound<'a, W> {
             state: State::First,
             newtype_variant: false,
             sequence_index: 0,
-            range_inclusive: Some(inclusive)
+            range_inclusive: Some(inclusive),
         }
     }
 }
@@ -1360,7 +1360,9 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
     {
         if let Some(inclusive) = self.range_inclusive {
             if key == "end" {
-                self.ser.output.write_str(if inclusive { "..=" } else { ".." })?;
+                self.ser
+                    .output
+                    .write_str(if inclusive { "..=" } else { ".." })?;
             }
 
             guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
