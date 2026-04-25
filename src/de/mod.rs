@@ -738,13 +738,25 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 if matches!(c, '0'..='9' | '+' | '-' | '.') {
                     let start = self.parser.any_number()?;
                     
-                    let _inclusive = if self.parser.consume_str("..=") {
+                    let inclusive = if self.parser.consume_str("..=") {
                         true
                     } else if self.parser.consume_str("..") {
                         false
                     } else {
                         return Err(Error::ExpectedRangeSyntax);
                     };
+
+                    if inclusive && name == "Range" {
+                        return Err(Error::Message(String::from(
+                            "expected `..` for Range, found `..=`",
+                        )));
+                    }
+                    
+                    if !inclusive && name == "RangeInclusive" {
+                        return Err(Error::Message(String::from(
+                            "expected `..=` for RangeInclusive, found `..`",
+                        )));
+                    }
 
                     let end = self.parser.any_number()?;
                     return visitor.visit_map(RangeMapAccess::new(start, end));
