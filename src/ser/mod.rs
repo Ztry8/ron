@@ -1359,7 +1359,7 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
         T: ?Sized + Serialize,
     {
         if let Some(inclusive) = self.range_inclusive {
-            if key == "end" {
+            if key == "end" || key == "last" {
                 self.ser
                     .output
                     .write_str(if inclusive { "..=" } else { ".." })?;
