@@ -1050,10 +1050,10 @@ impl<'a, W: fmt::Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         let old_newtype_variant = self.newtype_variant;
-        if len == 2 && name.starts_with("Range") {
+        if len == 2 && (name == "Range" || name == "RangeInclusive") {
             self.newtype_variant = false;
             self.implicit_some_depth = 0;
-            return Ok(Compound::new_range(self));
+            return Ok(Compound::new_range(self, name == "RangeInclusive"));
         }
 
         self.newtype_variant = false;
@@ -1112,7 +1112,7 @@ pub struct Compound<'a, W: fmt::Write> {
     state: State,
     newtype_variant: bool,
     sequence_index: usize,
-    range_mode: bool,
+    range_inclusive: Option<bool>,
 }
 
 impl<'a, W: fmt::Write> Compound<'a, W> {
@@ -1122,17 +1122,17 @@ impl<'a, W: fmt::Write> Compound<'a, W> {
             state: State::First,
             newtype_variant,
             sequence_index: 0,
-            range_mode: false,
+            range_inclusive: None,
         }
     }
 
-    fn new_range(ser: &'a mut Serializer<W>) -> Self {
+    fn new_range(ser: &'a mut Serializer<W>, inclusive: bool) -> Self {
         Compound {
             ser,
             state: State::First,
             newtype_variant: false,
             sequence_index: 0,
-            range_mode: true,
+            range_inclusive: Some(inclusive)
         }
     }
 }
@@ -1358,9 +1358,9 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
     where
         T: ?Sized + Serialize,
     {
-        if self.range_mode {
+        if let Some(inclusive) = self.range_inclusive {
             if key == "end" {
-                self.ser.output.write_str("..")?;
+                self.ser.output.write_str(if inclusive { "..=" } else { ".." })?;
             }
 
             guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
@@ -1430,7 +1430,7 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
     }
 
     fn end(self) -> Result<()> {
-        if self.range_mode {
+        if self.range_inclusive.is_some() {
             return Ok(());
         }
 
