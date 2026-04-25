@@ -349,7 +349,19 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             '(' => self.handle_any_struct(visitor, None),
             '[' => self.deserialize_seq(visitor),
             '{' => self.deserialize_map(visitor),
-            '0'..='9' | '+' | '-' | '.' => self.parser.any_number()?.visit(visitor),
+            '0'..='9' | '+' | '-' | '.' => {
+                let start = self.parser.any_number()?;
+
+                if self.parser.consume_str("..=") {
+                    let end = self.parser.any_number()?;
+                    return visitor.visit_map(RangeMapAccess::new(start, end));
+                } else if self.parser.consume_str("..") {
+                    let end = self.parser.any_number()?;
+                    return visitor.visit_map(RangeMapAccess::new(start, end));
+                }
+
+                start.visit(visitor)
+            }
             '"' | 'r' => self.deserialize_string(visitor),
             'b' if self.parser.src().starts_with("b'") => self.parser.any_number()?.visit(visitor),
             'b' => self.deserialize_byte_buf(visitor),
@@ -715,12 +727,31 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     fn deserialize_struct<V>(
         self,
         name: &'static str,
-        _fields: &'static [&'static str],
+        fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
+        if fields == ["start", "end"] {
+            if let Some(c) = self.parser.peek_char() {
+                if matches!(c, '0'..='9' | '+' | '-' | '.') {
+                    let start = self.parser.any_number()?;
+                    
+                    let _inclusive = if self.parser.consume_str("..=") {
+                        true
+                    } else if self.parser.consume_str("..") {
+                        false
+                    } else {
+                        return Err(Error::ExpectedRangeSyntax);
+                    };
+
+                    let end = self.parser.any_number()?;
+                    return visitor.visit_map(RangeMapAccess::new(start, end));
+                }
+            }
+        }
+
         if !self.newtype_variant {
             self.parser.consume_struct_name(name)?;
         }
@@ -824,6 +855,75 @@ impl<'a, 'de> CommaSeparated<'a, 'de> {
             // No trailing comma or terminator
             (false, true) => Err(Error::ExpectedComma),
         }
+    }
+}
+
+struct RangeMapAccess {
+    start: crate::value::Number,
+    end: crate::value::Number,
+    state: u8,
+}
+
+impl RangeMapAccess {
+    fn new(start: crate::value::Number, end: crate::value::Number) -> Self {
+        RangeMapAccess {
+            start,
+            end,
+            state: 0,
+        }
+    }
+}
+
+impl<'de> de::MapAccess<'de> for RangeMapAccess {
+    type Error = Error;
+
+    fn next_key_seed<K: de::DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>> {
+        match self.state {
+            0 => {
+                self.state = 1;
+                seed.deserialize(de::value::StrDeserializer::<Error>::new("start"))
+                    .map(Some)
+            }
+            2 => {
+                self.state = 3;
+                seed.deserialize(de::value::StrDeserializer::<Error>::new("end"))
+                    .map(Some)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
+        match self.state {
+            1 => {
+                self.state = 2;
+                seed.deserialize(NumberDeserializer(self.start))
+            }
+            3 => {
+                self.state = 4;
+                seed.deserialize(NumberDeserializer(self.end))
+            }
+            _ => Err(Error::ExpectedDifferentLength {
+                expected: String::from("map of length 2"),
+                found: 3,
+            }),
+        }
+    }
+}
+
+struct NumberDeserializer(crate::value::Number);
+
+impl<'de> de::Deserializer<'de> for NumberDeserializer {
+    type Error = Error;
+
+    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+        self.0.visit(visitor)
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64
+        char str string bytes byte_buf option unit unit_struct
+        newtype_struct seq tuple tuple_struct map struct enum identifier ignored_any
     }
 }
 

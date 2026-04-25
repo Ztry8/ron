@@ -837,7 +837,9 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let num_bytes = self.next_chars_while_len(is_float_char);
+        let raw_bytes = self.next_chars_while_len(is_float_char);
+        let src = &self.src()[..raw_bytes];
+        let num_bytes = src.find("..").unwrap_or(raw_bytes);
 
         if num_bytes == 0 {
             return Err(Error::ExpectedFloat);
@@ -1019,7 +1021,12 @@ impl<'a> Parser<'a> {
                 '+' | '-' => 1,
                 _ => 0,
             };
-            let valid_float_len = self.next_chars_while_from_len(skip, is_float_char);
+            let raw_float_len = self.next_chars_while_from_len(skip, is_float_char);
+            // Trim at ".." to avoid treating range operators as float chars
+            let valid_float_len = self.src()[skip..]
+                .find("..")
+                .map(|i| i.min(raw_float_len))
+                .unwrap_or(raw_float_len);
             let valid_int_len = self.next_chars_while_from_len(skip, is_int_char);
             valid_float_len > valid_int_len
         } else {
