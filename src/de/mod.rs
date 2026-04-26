@@ -937,10 +937,18 @@ impl<'a, 'de> CommaSeparated<'a, 'de> {
     }
 }
 
+enum RangeMapState {
+    StartKey,
+    StartValue,
+    EndKey,
+    EndValue,
+    Done,
+}
+
 struct RangeMapAccess {
     start: crate::value::Number,
     end: crate::value::Number,
-    state: u8,
+    state: RangeMapState,
     end_key: &'static str,
 }
 
@@ -949,7 +957,7 @@ impl RangeMapAccess {
         RangeMapAccess {
             start,
             end,
-            state: 0,
+            state: RangeMapState::StartKey,
             end_key,
         }
     }
@@ -960,13 +968,13 @@ impl<'de> de::MapAccess<'de> for RangeMapAccess {
 
     fn next_key_seed<K: de::DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>> {
         match self.state {
-            0 => {
-                self.state = 1;
+            RangeMapState::StartKey => {
+                self.state = RangeMapState::StartValue;
                 seed.deserialize(de::value::StrDeserializer::<Error>::new("start"))
                     .map(Some)
             }
-            2 => {
-                self.state = 3;
+            RangeMapState::EndKey => {
+                self.state = RangeMapState::EndValue;
                 seed.deserialize(de::value::StrDeserializer::<Error>::new(self.end_key))
                     .map(Some)
             }
@@ -976,12 +984,12 @@ impl<'de> de::MapAccess<'de> for RangeMapAccess {
 
     fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
         match self.state {
-            1 => {
-                self.state = 2;
+            RangeMapState::StartValue => {
+                self.state = RangeMapState::EndKey;
                 seed.deserialize(NumberDeserializer(self.start))
             }
-            3 => {
-                self.state = 4;
+            RangeMapState::EndValue => {
+                self.state = RangeMapState::Done;
                 seed.deserialize(NumberDeserializer(self.end))
             }
             _ => Err(Error::ExpectedDifferentLength {
