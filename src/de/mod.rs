@@ -757,7 +757,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if fields == ["start", "end"] || fields == ["start", "last"] {
+        if let ["start", end_field] = fields {
             if let Some(c) = self.parser.peek_char() {
                 if matches!(c, '0'..='9' | '+' | '-' | '.' | 'b')
                     && (c != 'b' || self.parser.src().starts_with("b'"))
@@ -785,7 +785,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     }
 
                     let end = self.parser.any_number()?;
-                    return visitor.visit_map(RangeMapAccess::new(start, end, fields[1]));
+                    return visitor.visit_map(RangeMapAccess::new(start, end, end_field));
                 }
             }
         }
