@@ -153,6 +153,14 @@ macro_rules! guard_recursion {
     }};
 }
 
+struct VisitorExpecting<V>(V);
+
+impl<'de, V: Visitor<'de>> core::fmt::Display for VisitorExpecting<&'_ V> {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        self.0.expecting(fmt)
+    }
+}
+
 impl<'de> Deserializer<'de> {
     /// Check if the remaining bytes are whitespace only,
     /// otherwise return an error.
@@ -758,6 +766,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        let visitor_name = VisitorExpecting(&visitor).to_string();
+
         if let ["start", end_field] = fields {
             if let Some(c) = self.parser.peek_char() {
                 if matches!(c, '0'..='9' | '+' | '-' | '.' | 'b')
@@ -773,13 +783,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         return Err(Error::ExpectedRangeSyntax);
                     };
 
-                    if inclusive && name == "Range" {
+                    if inclusive && visitor_name == "struct Range" {
                         return Err(Error::Message(String::from(
                             "expected `..` for Range, found `..=`",
                         )));
                     }
-
-                    if !inclusive && name == "RangeInclusive" {
+                    if !inclusive && visitor_name == "struct RangeInclusive" {
                         return Err(Error::Message(String::from(
                             "expected `..=` for RangeInclusive, found `..`",
                         )));
@@ -791,7 +800,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
 
-        if fields == ["start"] && name == "RangeFrom" {
+        if fields == ["start"] && (name == "RangeFrom" || visitor_name == "struct RangeFrom") {
             if let Some(c) = self.parser.peek_char() {
                 if matches!(c, '0'..='9' | '+' | '-' | 'b')
                     && (c != 'b' || self.parser.src().starts_with("b'"))
@@ -809,7 +818,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
 
-        if fields == ["end"] && (name == "RangeTo" || name == "RangeToInclusive") {
+        if fields == ["end"]
+            && (name == "RangeTo"
+                || name == "RangeToInclusive"
+                || visitor_name == "struct RangeTo"
+                || visitor_name == "struct RangeToInclusive")
+        {
             if self.parser.check_str("..=") || self.parser.check_str("..") {
                 let inclusive = if self.parser.consume_str("..=") {
                     true
@@ -817,12 +831,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     self.parser.consume_str("..");
                     false
                 };
-                if inclusive && name == "RangeTo" {
+                if inclusive && (name == "RangeTo" || visitor_name == "struct RangeTo") {
                     return Err(Error::Message(String::from(
                         "expected `..` for RangeTo, found `..=`",
                     )));
                 }
-                if !inclusive && name == "RangeToInclusive" {
+                if !inclusive
+                    && (name == "RangeToInclusive" || visitor_name == "struct RangeToInclusive")
+                {
                     return Err(Error::Message(String::from(
                         "expected `..=` for RangeToInclusive, found `..`",
                     )));

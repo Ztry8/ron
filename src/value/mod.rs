@@ -260,7 +260,10 @@ pub(crate) struct NumberDeserializer(pub(crate) Number);
 impl<'de> serde::de::Deserializer<'de> for NumberDeserializer {
     type Error = crate::error::Error;
 
-    fn deserialize_any<V: serde::de::Visitor<'de>>(self, visitor: V) -> crate::error::Result<V::Value> {
+    fn deserialize_any<V: serde::de::Visitor<'de>>(
+        self,
+        visitor: V,
+    ) -> crate::error::Result<V::Value> {
         self.0.visit(visitor)
     }
 
