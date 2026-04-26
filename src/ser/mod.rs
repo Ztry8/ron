@@ -120,6 +120,9 @@ pub struct PrettyConfig {
     pub number_suffixes: bool,
     /// Additional path-based field metadata to serialize
     pub path_meta: Option<path_meta::Field>,
+    /// Enable compact range syntax, e.g. `0..5` instead of `(start: 0, end: 5)`.
+    /// Only works correctly when the range bounds are numbers.
+    pub compact_ranges: bool,
 }
 
 impl PrettyConfig {
@@ -348,6 +351,39 @@ impl PrettyConfig {
 
         self
     }
+
+    /// Configures whether ranges should be serialized using compact syntax (`true`)
+    /// or as regular structs (`false`).
+    ///
+    /// When `false`, `0..5` will serialize to
+    /// ```ignore
+    /// (
+    ///     start: 0,
+    ///     end: 5,
+    /// )
+    /// # ;
+    /// ```
+    /// When `true`, `0..5` will instead serialize to
+    /// ```ignore
+    /// 0..5
+    /// # ;
+    /// ```
+    /// and `1..=3` will serialize to
+    /// ```ignore
+    /// 1..=3
+    /// # ;
+    /// ```
+    ///
+    /// Note: this option only produces correct output when the range bounds
+    /// are numeric types. Non-numeric bounds will serialize but cannot be
+    /// deserialized back.
+    ///
+    /// Default: `false`
+    #[must_use]
+    pub fn compact_ranges(mut self, compact_ranges: bool) -> Self {
+        self.compact_ranges = compact_ranges;
+        self
+    }
 }
 
 impl Default for PrettyConfig {
@@ -371,6 +407,7 @@ impl Default for PrettyConfig {
             compact_maps: false,
             number_suffixes: false,
             path_meta: None,
+            compact_ranges: false,
         }
     }
 }
@@ -486,6 +523,12 @@ impl<W: fmt::Write> Serializer<W> {
         self.pretty
             .as_ref()
             .map_or(false, |(ref config, _)| config.number_suffixes)
+    }
+
+    fn compact_ranges(&self) -> bool {
+        self.pretty
+            .as_ref()
+            .map_or(false, |(ref config, _)| config.compact_ranges)
     }
 
     fn extensions(&self) -> Extensions {
@@ -1050,9 +1093,10 @@ impl<'a, W: fmt::Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         let old_newtype_variant = self.newtype_variant;
-        if (len == 2 && (name == "Range" || name == "RangeInclusive"))
-            || (len == 1
-                && (name == "RangeFrom" || name == "RangeTo" || name == "RangeToInclusive"))
+        if self.compact_ranges()
+            && ((len == 2 && (name == "Range" || name == "RangeInclusive"))
+                || (len == 1
+                    && (name == "RangeFrom" || name == "RangeTo" || name == "RangeToInclusive")))
         {
             self.newtype_variant = false;
             self.implicit_some_depth = 0;

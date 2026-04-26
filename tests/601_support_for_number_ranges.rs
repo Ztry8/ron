@@ -19,7 +19,24 @@ fn test_ranges() {
     };
 
     let ser = ron::to_string(&ranges).unwrap();
-    assert_eq!(ser, "(a:0..5,b:1..=3,c:0.6..4.3,d:0.3..=5.7)");
+    assert_eq!(
+        ser,
+        "(a:(start:0,end:5),b:(start:1,end:3),c:(start:0.6,end:4.3),d:(start:0.3,end:5.7))"
+    );
+
+    assert_eq!(
+        ron::ser::to_string_pretty(
+            &ranges,
+            ron::ser::PrettyConfig::new()
+                .compact_ranges(true)
+                .new_line("")
+                .indentor("")
+                .separator("")
+                .compact_structs(true)
+        )
+        .unwrap(),
+        "(a:0..5,b:1..=3,c:0.6..4.3,d:0.3..=5.7)"
+    );
 
     let de: RangeTest = ron::from_str(&ser).unwrap();
     assert_eq!(de, ranges);
