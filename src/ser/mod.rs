@@ -1050,10 +1050,17 @@ impl<'a, W: fmt::Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         let old_newtype_variant = self.newtype_variant;
-        if len == 2 && (name == "Range" || name == "RangeInclusive") {
+        if (len == 2 && (name == "Range" || name == "RangeInclusive"))
+            || (len == 1
+                && (name == "RangeFrom" || name == "RangeTo" || name == "RangeToInclusive"))
+        {
             self.newtype_variant = false;
             self.implicit_some_depth = 0;
-            return Ok(Compound::new_range(self, name == "RangeInclusive"));
+            return Ok(Compound::new_range(
+                self,
+                name == "RangeInclusive" || name == "RangeToInclusive",
+                name == "RangeFrom",
+            ));
         }
 
         self.newtype_variant = false;
@@ -1113,6 +1120,7 @@ pub struct Compound<'a, W: fmt::Write> {
     newtype_variant: bool,
     sequence_index: usize,
     range_inclusive: Option<bool>,
+    range_from: bool,
 }
 
 impl<'a, W: fmt::Write> Compound<'a, W> {
@@ -1123,16 +1131,18 @@ impl<'a, W: fmt::Write> Compound<'a, W> {
             newtype_variant,
             sequence_index: 0,
             range_inclusive: None,
+            range_from: false,
         }
     }
 
-    fn new_range(ser: &'a mut Serializer<W>, inclusive: bool) -> Self {
+    fn new_range(ser: &'a mut Serializer<W>, inclusive: bool, range_from: bool) -> Self {
         Compound {
             ser,
             state: State::First,
             newtype_variant: false,
             sequence_index: 0,
             range_inclusive: Some(inclusive),
+            range_from,
         }
     }
 }
@@ -1359,13 +1369,23 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
         T: ?Sized + Serialize,
     {
         if let Some(inclusive) = self.range_inclusive {
-            if key == "end" || key == "last" {
-                self.ser
-                    .output
-                    .write_str(if inclusive { "..=" } else { ".." })?;
+            match key {
+                "start" => {
+                    guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
+                    if self.range_from {
+                        self.ser.output.write_str("..")?;
+                    }
+                }
+                "end" | "last" => {
+                    self.ser
+                        .output
+                        .write_str(if inclusive { "..=" } else { ".." })?;
+                    guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
+                }
+                _ => {
+                    guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
+                }
             }
-
-            guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
             return Ok(());
         }
 

@@ -356,6 +356,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     let end = self.parser.any_number()?;
                     return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
                 } else if self.parser.consume_str("..") {
+                    if self.parser.peek_char().map_or(true, |c| {
+                        !matches!(c, '0'..='9' | '+' | '-' | 'b')
+                            || (c == 'b' && !self.parser.src().starts_with("b'"))
+                    }) {
+                        return visitor.visit_map(RangeFromMapAccess::new(start));
+                    }
                     let end = self.parser.any_number()?;
                     return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
                 }
@@ -370,6 +376,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     let end = self.parser.any_number()?;
                     return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
                 } else if self.parser.consume_str("..") {
+                    if self.parser.peek_char().map_or(true, |c| {
+                        !matches!(c, '0'..='9' | '+' | '-' | 'b')
+                            || (c == 'b' && !self.parser.src().starts_with("b'"))
+                    }) {
+                        return visitor.visit_map(RangeFromMapAccess::new(start));
+                    }
                     let end = self.parser.any_number()?;
                     return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
                 }
@@ -778,6 +790,47 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
 
+        if fields == ["start"] && name == "RangeFrom" {
+            if let Some(c) = self.parser.peek_char() {
+                if matches!(c, '0'..='9' | '+' | '-' | 'b')
+                    && (c != 'b' || self.parser.src().starts_with("b'"))
+                {
+                    let start = self.parser.any_number()?;
+                    if self.parser.consume_str("..=") {
+                        return Err(Error::Message(String::from(
+                            "expected `..` for RangeFrom, found `..=`",
+                        )));
+                    } else if !self.parser.consume_str("..") {
+                        return Err(Error::ExpectedRangeSyntax);
+                    }
+                    return visitor.visit_map(RangeFromMapAccess::new(start));
+                }
+            }
+        }
+
+        if fields == ["end"] && (name == "RangeTo" || name == "RangeToInclusive") {
+            if self.parser.check_str("..=") || self.parser.check_str("..") {
+                let inclusive = if self.parser.consume_str("..=") {
+                    true
+                } else {
+                    self.parser.consume_str("..");
+                    false
+                };
+                if inclusive && name == "RangeTo" {
+                    return Err(Error::Message(String::from(
+                        "expected `..` for RangeTo, found `..=`",
+                    )));
+                }
+                if !inclusive && name == "RangeToInclusive" {
+                    return Err(Error::Message(String::from(
+                        "expected `..=` for RangeToInclusive, found `..`",
+                    )));
+                }
+                let end = self.parser.any_number()?;
+                return visitor.visit_map(RangeToMapAccess::new(end, fields[0]));
+            }
+        }
+
         if !self.newtype_variant {
             self.parser.consume_struct_name(name)?;
         }
@@ -936,6 +989,67 @@ impl<'de> de::MapAccess<'de> for RangeMapAccess {
                 found: 3,
             }),
         }
+    }
+}
+
+struct RangeFromMapAccess {
+    start: crate::value::Number,
+    done: bool,
+}
+
+impl RangeFromMapAccess {
+    fn new(start: crate::value::Number) -> Self {
+        RangeFromMapAccess { start, done: false }
+    }
+}
+
+impl<'de> de::MapAccess<'de> for RangeFromMapAccess {
+    type Error = Error;
+
+    fn next_key_seed<K: de::DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>> {
+        if self.done {
+            return Ok(None);
+        }
+        seed.deserialize(de::value::StrDeserializer::<Error>::new("start"))
+            .map(Some)
+    }
+
+    fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
+        self.done = true;
+        seed.deserialize(NumberDeserializer(self.start))
+    }
+}
+
+struct RangeToMapAccess {
+    end: crate::value::Number,
+    end_key: &'static str,
+    done: bool,
+}
+
+impl RangeToMapAccess {
+    fn new(end: crate::value::Number, end_key: &'static str) -> Self {
+        RangeToMapAccess {
+            end,
+            end_key,
+            done: false,
+        }
+    }
+}
+
+impl<'de> de::MapAccess<'de> for RangeToMapAccess {
+    type Error = Error;
+
+    fn next_key_seed<K: de::DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>> {
+        if self.done {
+            return Ok(None);
+        }
+        seed.deserialize(de::value::StrDeserializer::<Error>::new(self.end_key))
+            .map(Some)
+    }
+
+    fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
+        self.done = true;
+        seed.deserialize(NumberDeserializer(self.end))
     }
 }
 

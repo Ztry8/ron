@@ -68,3 +68,12 @@ fn test_range_untagged() {
         MaybeRange::Value(42)
     );
 }
+
+#[test]
+fn test_unclosed_ranges() {
+    assert_eq!(ron::from_str::<std::ops::RangeTo<i32>>("..3").unwrap(), ..3);
+    assert_eq!(
+        ron::from_str::<std::ops::RangeFrom<i32>>("1..").unwrap(),
+        1..
+    );
+}
