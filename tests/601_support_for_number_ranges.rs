@@ -24,3 +24,47 @@ fn test_ranges() {
     let de: RangeTest = ron::from_str(&ser).unwrap();
     assert_eq!(de, ranges);
 }
+
+#[test]
+fn test_range_integer_bases() {
+    assert_eq!(
+        ron::from_str::<std::ops::Range<u8>>("0b0000..0b0101").unwrap(),
+        0..5
+    );
+    assert_eq!(
+        ron::from_str::<std::ops::Range<u8>>("0o0..0o5").unwrap(),
+        0..5
+    );
+    assert_eq!(
+        ron::from_str::<std::ops::Range<u8>>("0x0..0x5").unwrap(),
+        0..5
+    );
+
+    assert_eq!(
+        ron::from_str::<std::ops::Range<u8>>("b'\\x00'..b'\\x05'").unwrap(),
+        0..5
+    );
+    assert_eq!(
+        ron::from_str::<std::ops::RangeInclusive<u8>>("b'A'..=b'Z'").unwrap(),
+        b'A'..=b'Z'
+    );
+}
+
+#[derive(PartialEq, Deserialize, Serialize, Debug)]
+#[serde(untagged)]
+enum MaybeRange {
+    Range(std::ops::Range<i32>),
+    Value(i32),
+}
+
+#[test]
+fn test_range_untagged() {
+    assert_eq!(
+        ron::from_str::<MaybeRange>("0..5").unwrap(),
+        MaybeRange::Range(0..5)
+    );
+    assert_eq!(
+        ron::from_str::<MaybeRange>("42").unwrap(),
+        MaybeRange::Value(42)
+    );
+}
