@@ -363,7 +363,19 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 start.visit(visitor)
             }
             '"' | 'r' => self.deserialize_string(visitor),
-            'b' if self.parser.src().starts_with("b'") => self.parser.any_number()?.visit(visitor),
+            'b' if self.parser.src().starts_with("b'") => {
+                let start = self.parser.any_number()?;
+
+                if self.parser.consume_str("..=") {
+                    let end = self.parser.any_number()?;
+                    return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
+                } else if self.parser.consume_str("..") {
+                    let end = self.parser.any_number()?;
+                    return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
+                }
+
+                start.visit(visitor)
+            }
             'b' => self.deserialize_byte_buf(visitor),
             '\'' => self.deserialize_char(visitor),
             other => Err(Error::UnexpectedChar(other)),
@@ -735,7 +747,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         if fields == ["start", "end"] || fields == ["start", "last"] {
             if let Some(c) = self.parser.peek_char() {
-                if matches!(c, '0'..='9' | '+' | '-' | '.') {
+                if matches!(c, '0'..='9' | '+' | '-' | '.' | 'b')
+                    && (c != 'b' || self.parser.src().starts_with("b'"))
+                {
                     let start = self.parser.any_number()?;
 
                     let inclusive = if self.parser.consume_str("..=") {
