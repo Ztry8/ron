@@ -350,7 +350,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             '(' => self.handle_any_struct(visitor, None),
             '[' => self.deserialize_seq(visitor),
             '{' => self.deserialize_map(visitor),
-            '0'..='9' | '+' | '-' | '.' => {
+            '0'..='9' | '+' | '-' | '.' | 'b' => {
+                if self.parser.check_char('b') && !self.parser.src().starts_with("b'") {
+                    return self.deserialize_byte_buf(visitor);
+                }
+
                 let start = self.parser.any_number()?;
 
                 if self.parser.consume_str("..=") {
@@ -370,26 +374,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 start.visit(visitor)
             }
             '"' | 'r' => self.deserialize_string(visitor),
-            'b' if self.parser.src().starts_with("b'") => {
-                let start = self.parser.any_number()?;
-
-                if self.parser.consume_str("..=") {
-                    let end = self.parser.any_number()?;
-                    return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-                } else if self.parser.consume_str("..") {
-                    if self.parser.peek_char().map_or(true, |c| {
-                        !matches!(c, '0'..='9' | '+' | '-' | 'b')
-                            || (c == 'b' && !self.parser.src().starts_with("b'"))
-                    }) {
-                        return visitor.visit_map(RangeFromMapAccess::new(start));
-                    }
-                    let end = self.parser.any_number()?;
-                    return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-                }
-
-                start.visit(visitor)
-            }
-            'b' => self.deserialize_byte_buf(visitor),
             '\'' => self.deserialize_char(visitor),
             other => Err(Error::UnexpectedChar(other)),
         }
