@@ -1,6 +1,21 @@
 use ron;
 use serde::{Deserialize, Serialize};
 
+// NOTE:
+// std::ops::RangeToInclusive and RangeFull do not have stable serde support out of the box.
+// We use `serde(remote = "...")` to define how these std types should be serialized/deserialized.
+
+#[derive(PartialEq, Deserialize, Serialize, Debug)]
+#[serde(remote = "std::ops::RangeToInclusive")]
+struct RangeToInclusive<T> {
+    end: T,
+}
+
+#[derive(PartialEq, Deserialize, Serialize, Debug)]
+#[serde(remote = "std::ops::RangeFull")]
+struct RangeFull;
+
+
 #[derive(PartialEq, Deserialize, Serialize, Debug)]
 struct RangeTest {
     a: std::ops::Range<i32>,
@@ -86,11 +101,52 @@ fn test_range_untagged() {
     );
 }
 
+#[derive(PartialEq, Deserialize, Serialize, Debug)]
+struct UnclosedRangeTest {
+    a: std::ops::RangeFrom<i32>,
+    b: std::ops::RangeTo<i32>,
+    #[serde(with = "RangeToInclusive")]
+    c: std::ops::RangeToInclusive<i32>,
+    d: std::ops::RangeFrom<f32>,
+    e: std::ops::RangeTo<f32>,
+    #[serde(with = "RangeToInclusive")]
+    f: std::ops::RangeToInclusive<f32>,
+    #[serde(with = "RangeFull")]
+    g: std::ops::RangeFull,
+}
+
 #[test]
 fn test_unclosed_ranges() {
-    assert_eq!(ron::from_str::<std::ops::RangeTo<i32>>("..3").unwrap(), ..3);
+    let ranges = UnclosedRangeTest {
+        a: 2..,
+        b: ..3,
+        c: ..=3,
+        d: 1.5..,
+        e: ..2.3,
+        f:..=2.3,
+        g: ..,
+    };
+
+    let ser = ron::to_string(&ranges).unwrap();
     assert_eq!(
-        ron::from_str::<std::ops::RangeFrom<i32>>("1..").unwrap(),
-        1..
+        ser,
+        "(a:(start:2),b:(end:3),c:(end:3),d:(start:1.5),e:(end:2.3),f:(end:2.3),g:())"
     );
+
+    assert_eq!(
+        ron::ser::to_string_pretty(
+            &ranges,
+            ron::ser::PrettyConfig::new()
+                .compact_ranges(true)
+                .new_line("")
+                .indentor("")
+                .separator("")
+                .compact_structs(true)
+        )
+        .unwrap(),
+        "(a:2..,b:..3,c:..=3,d:1.5..,e:..2.3,f:..=2.3,g:..)"
+    );
+
+    let de: UnclosedRangeTest = ron::from_str(&ser).unwrap();
+    assert_eq!(de, ranges);
 }

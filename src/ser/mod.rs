@@ -909,6 +909,11 @@ impl<'a, W: fmt::Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_unit_struct(self, name: &'static str) -> Result<()> {
+        if self.compact_ranges() && name == "RangeFull" {
+            self.output.write_str("..")?;
+            return Ok(());
+        }
+
         if self.struct_names() && !self.newtype_variant {
             self.write_identifier(name)?;
 

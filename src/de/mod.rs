@@ -355,6 +355,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     return self.deserialize_byte_buf(visitor);
                 }
 
+                if self.parser.check_str("..") {
+                    self.parser.consume_str("..");
+                    return visitor.visit_unit();
+                }
+
                 let start = self.parser.any_number()?;
 
                 if self.parser.consume_str("..=") {
@@ -571,6 +576,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        if name == "RangeFull" && self.parser.consume_str("..") {
+            return visitor.visit_unit();
+        }
+
         if self.newtype_variant || self.parser.consume_struct_name(name)? {
             self.newtype_variant = false;
 
