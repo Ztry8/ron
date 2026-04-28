@@ -768,7 +768,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         let visitor_name = VisitorExpecting(&visitor).to_string();
 
-        if let ["start", end_field] = fields {
+        if let ["start", end_field @ ("end" | "last")] = fields {
             if let Some(c) = self.parser.peek_char() {
                 if matches!(c, '0'..='9' | '+' | '-' | '.' | 'b')
                     && (c != 'b' || self.parser.src().starts_with("b'"))
