@@ -51,6 +51,8 @@ digit_binary = "0" | "1";
 digit_octal = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7";
 digit_hexadecimal = digit | "A" | "a" | "B" | "b" | "C" | "c" | "D" | "d" | "E" | "e" | "F" | "f";
 
+number = integer | byte | float;
+
 integer = ["+" | "-"], unsigned, [integer_suffix];
 integer_suffix = ("i", "u"), ("8", "16", "32", "64", "128");
 
