@@ -143,12 +143,12 @@ option_some = "Some", ws, "(", ws, value, ws, ")";
 
 ```ebnf
 range = range_from_to_inclusive | range_from_to_exclusive | range_from | range_to_inclusive | range_to_exclusive | range_full;
-range_from_to_inclusive = value, ws, "..=", ws, value;
-range_from_to_exclusive = value, ws, "..", ws, value;
-range_from              = value, ws, "..";
-range_to_inclusive      = "..=", ws, value;
-range_to_exclusive      = "..", ws, value;
-range_full              = "..";
+range_from_to_inclusive = number, ws, "..=", ws, number;
+range_from_to_exclusive = number, ws, "..", ws, number;
+range_from = number, ws, "..";
+range_to_inclusive = "..=", ws, number;
+range_to_exclusive = "..", ws, number;
+range_full = "..";
 ```
 
 > Note: Alternatives are ordered by specificity — `..=` must be matched before `..`
