@@ -12,7 +12,7 @@
 
 RON is a simple readable data serialization format that looks similar to Rust syntax.
 It's designed to support all of [Serde's data model](https://serde.rs/data-model.html), so
-structs, enums, tuples, arrays, generic maps, ranges and primitive values.
+structs, enums, tuples, arrays, generic maps, ranges, and primitive values.
 
 ## Example
 
