@@ -153,6 +153,10 @@ macro_rules! guard_recursion {
     }};
 }
 
+fn is_number_start(c: char, src: &str) -> bool {
+    matches!(c, '0'..='9' | '+' | '-' | '.' | 'b') && (c != 'b' || src.starts_with("b'"))
+}
+
 impl<'de> Deserializer<'de> {
     /// Check if the remaining bytes are whitespace only,
     /// otherwise return an error.
@@ -754,9 +758,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         if name == "Range" || name == "RangeInclusive" {
             if let ["start", end_field @ ("end" | "last")] = fields {
                 if let Some(c) = self.parser.peek_char() {
-                    if matches!(c, '0'..='9' | '+' | '-' | '.' | 'b')
-                        && (c != 'b' || self.parser.src().starts_with("b'"))
-                    {
+                    if is_number_start(c, self.parser.src()) {
                         let start = self.parser.any_number()?;
 
                         let inclusive = if self.parser.consume_str("..=") {
@@ -787,9 +789,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
         if fields == ["start"] && name == "RangeFrom" {
             if let Some(c) = self.parser.peek_char() {
-                if matches!(c, '0'..='9' | '+' | '-' | 'b')
-                    && (c != 'b' || self.parser.src().starts_with("b'"))
-                {
+                if is_number_start(c, self.parser.src()) {
                     let start = self.parser.any_number()?;
                     if self.parser.consume_str("..=") {
                         return Err(Error::Message(String::from(
