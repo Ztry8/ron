@@ -94,6 +94,7 @@ fn test_range_integer_bases() {
 #[serde(untagged)]
 enum MaybeRange {
     Range(std::ops::Range<i32>),
+    RangeFrom(std::ops::RangeFrom<i32>),
     Value(i32),
 }
 
@@ -102,6 +103,10 @@ fn test_range_untagged() {
     assert_eq!(
         ron::from_str::<MaybeRange>("0..5").unwrap(),
         MaybeRange::Range(0..5)
+    );
+    assert_eq!(
+        ron::from_str::<MaybeRange>("0..").unwrap(),
+        MaybeRange::RangeFrom(0..)
     );
     assert_eq!(
         ron::from_str::<MaybeRange>("42").unwrap(),
