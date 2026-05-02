@@ -149,3 +149,9 @@ fn test_unclosed_ranges() {
     let de: UnclosedRangeTest = ron::from_str(&ser).unwrap();
     assert_eq!(de, ranges);
 }
+
+#[test]
+fn test_string_range() {
+    assert!(ron::from_str::<std::ops::Range<&str>>("\"x\"..\"h\"").is_err());
+    assert!(ron::from_str::<std::ops::Range<i32>>("\"x\"..\"h\"").is_err());
+}

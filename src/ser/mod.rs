@@ -1,5 +1,6 @@
 use alloc::{borrow::Cow, string::String};
 use core::fmt;
+use std::string::ToString;
 
 use serde::{ser, ser::Serialize};
 use serde_derive::{Deserialize, Serialize};
@@ -121,7 +122,6 @@ pub struct PrettyConfig {
     /// Additional path-based field metadata to serialize
     pub path_meta: Option<path_meta::Field>,
     /// Enable compact range syntax, e.g. `0..5` instead of `(start: 0, end: 5)`.
-    /// Only works correctly when the range bounds are numbers.
     pub compact_ranges: bool,
 }
 
@@ -1168,8 +1168,7 @@ pub struct Compound<'a, W: fmt::Write> {
     state: State,
     newtype_variant: bool,
     sequence_index: usize,
-    range_inclusive: Option<bool>,
-    range_from: bool,
+    range: Option<RangeCompound>,
 }
 
 impl<'a, W: fmt::Write> Compound<'a, W> {
@@ -1179,8 +1178,7 @@ impl<'a, W: fmt::Write> Compound<'a, W> {
             state: State::First,
             newtype_variant,
             sequence_index: 0,
-            range_inclusive: None,
-            range_from: false,
+            range: None,
         }
     }
 
@@ -1190,9 +1188,235 @@ impl<'a, W: fmt::Write> Compound<'a, W> {
             state: State::First,
             newtype_variant: false,
             sequence_index: 0,
-            range_inclusive: Some(inclusive),
-            range_from,
+            range: Some(RangeCompound::new(inclusive, range_from)),
         }
+    }
+}
+
+struct RangeCompound {
+    inclusive: bool,
+    range_from: bool,
+    /// Buffered fields: key → serialized string (only if numeric)
+    fields: alloc::collections::BTreeMap<&'static str, String>,
+    /// Set to true if any field was found to be non-numeric
+    fallback: bool,
+}
+
+impl RangeCompound {
+    fn new(inclusive: bool, range_from: bool) -> Self {
+        RangeCompound {
+            inclusive,
+            range_from,
+            fields: alloc::collections::BTreeMap::new(),
+            fallback: false,
+        }
+    }
+
+    /// Try to serialize `value` as a number into a String buffer.
+    /// Returns `Some(s)` if numeric, `None` otherwise.
+    fn try_serialize_number<T: ?Sized + Serialize>(value: &T) -> Option<String> {
+        struct NumberSerializer;
+
+        impl ser::Serializer for NumberSerializer {
+            type Ok = String;
+            type Error = Error;
+            type SerializeSeq = ser::Impossible<String, Error>;
+            type SerializeTuple = ser::Impossible<String, Error>;
+            type SerializeTupleStruct = ser::Impossible<String, Error>;
+            type SerializeTupleVariant = ser::Impossible<String, Error>;
+            type SerializeMap = ser::Impossible<String, Error>;
+            type SerializeStruct = ser::Impossible<String, Error>;
+            type SerializeStructVariant = ser::Impossible<String, Error>;
+
+            fn serialize_i8(self, v: i8) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_i16(self, v: i16) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_i32(self, v: i32) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_i64(self, v: i64) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_u8(self, v: u8) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_u16(self, v: u16) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_u32(self, v: u32) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_u64(self, v: u64) -> Result<String> {
+                Ok(v.to_string())
+            }
+            fn serialize_f32(self, v: f32) -> Result<String> {
+                let mut s = v.to_string();
+                if v % 1. == 0.0 {
+                    s.push_str(".0");
+                }
+                Ok(s)
+            }
+            fn serialize_f64(self, v: f64) -> Result<String> {
+                let mut s = v.to_string();
+                if v % 1. == 0.0 {
+                    s.push_str(".0");
+                }
+                Ok(s)
+            }
+            #[cfg(feature = "integer128")]
+            fn serialize_i128(self, v: i128) -> Result<String> {
+                Ok(v.to_string())
+            }
+            #[cfg(feature = "integer128")]
+            fn serialize_u128(self, v: u128) -> Result<String> {
+                Ok(v.to_string())
+            }
+
+            fn serialize_bool(self, _: bool) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("bool"),
+                })
+            }
+            fn serialize_char(self, _: char) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("char"),
+                })
+            }
+            fn serialize_str(self, _: &str) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("string"),
+                })
+            }
+            fn serialize_bytes(self, _: &[u8]) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("bytes"),
+                })
+            }
+            fn serialize_none(self) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("None"),
+                })
+            }
+            fn serialize_some<T: ?Sized + Serialize>(self, _: &T) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("Some"),
+                })
+            }
+            fn serialize_unit(self) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("unit"),
+                })
+            }
+            fn serialize_unit_struct(self, _: &'static str) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("unit struct"),
+                })
+            }
+            fn serialize_unit_variant(
+                self,
+                _: &'static str,
+                _: u32,
+                _: &'static str,
+            ) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("unit variant"),
+                })
+            }
+            fn serialize_newtype_struct<T: ?Sized + Serialize>(
+                self,
+                _: &'static str,
+                _: &T,
+            ) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("newtype struct"),
+                })
+            }
+            fn serialize_newtype_variant<T: ?Sized + Serialize>(
+                self,
+                _: &'static str,
+                _: u32,
+                _: &'static str,
+                _: &T,
+            ) -> Result<String> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("newtype variant"),
+                })
+            }
+            fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("seq"),
+                })
+            }
+            fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("tuple"),
+                })
+            }
+            fn serialize_tuple_struct(
+                self,
+                _: &'static str,
+                _: usize,
+            ) -> Result<Self::SerializeTupleStruct> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("tuple struct"),
+                })
+            }
+            fn serialize_tuple_variant(
+                self,
+                _: &'static str,
+                _: u32,
+                _: &'static str,
+                _: usize,
+            ) -> Result<Self::SerializeTupleVariant> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("tuple variant"),
+                })
+            }
+            fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("map"),
+                })
+            }
+            fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self::SerializeStruct> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("struct"),
+                })
+            }
+            fn serialize_struct_variant(
+                self,
+                _: &'static str,
+                _: u32,
+                _: &'static str,
+                _: usize,
+            ) -> Result<Self::SerializeStructVariant> {
+                Err(Error::InvalidValueForType {
+                    expected: String::from("number"),
+                    found: String::from("struct variant"),
+                })
+            }
+        }
+
+        value.serialize(NumberSerializer).ok()
     }
 }
 
@@ -1417,25 +1641,42 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
     where
         T: ?Sized + Serialize,
     {
-        if let Some(inclusive) = self.range_inclusive {
-            match key {
-                "start" => {
-                    guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
-                    if self.range_from {
-                        self.ser.output.write_str("..")?;
+        if let Some(ref mut range) = self.range {
+            if !range.fallback {
+                match RangeCompound::try_serialize_number(value) {
+                    Some(s) => {
+                        range.fields.insert(key, s);
+                    }
+                    None => {
+                        range.fallback = true;
                     }
                 }
-                "end" | "last" => {
-                    self.ser
-                        .output
-                        .write_str(if inclusive { "..=" } else { ".." })?;
-                    guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
+                if !range.fallback {
+                    return Ok(());
                 }
-                _ => {
-                    guard_recursion! { self.ser => value.serialize(&mut *self.ser)? };
+                // fallback: emit normal struct header and all buffered fields so far
+                if !self.ser.compact_structs() {
+                    self.ser.output.write_char('(')?;
+                    self.ser.output.write_char('\n')?; // start_indent equivalent
                 }
+                let buffered: alloc::vec::Vec<_> = range.fields.iter().collect();
+                for (bkey, bval) in &buffered {
+                    if !self.ser.compact_structs() {
+                        self.ser.indent()?;
+                    }
+                    self.ser.write_identifier(bkey)?;
+                    self.ser.output.write_char(':')?;
+                    if let Some((ref config, _)) = self.ser.pretty {
+                        self.ser.output.write_str(&config.separator)?;
+                    }
+                    self.ser.output.write_str(bval)?;
+                    self.ser.output.write_char(',')?;
+                    if let Some((ref config, _)) = self.ser.pretty {
+                        self.ser.output.write_str(&config.new_line)?;
+                    }
+                }
+                // now fall through to emit the current non-numeric field normally below
             }
-            return Ok(());
         }
 
         let mut restore_field = self.ser.pretty.as_mut().and_then(|(config, _)| {
@@ -1501,8 +1742,37 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
     }
 
     fn end(self) -> Result<()> {
-        if self.range_inclusive.is_some() {
-            return Ok(());
+        if let Some(ref range) = self.range {
+            if !range.fallback {
+                // All fields were numeric — emit compact syntax
+                let sep = if range.inclusive { "..=" } else { ".." };
+                if range.range_from {
+                    // RangeFrom: only "start" field, emit `start..`
+                    let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
+                    write!(self.ser.output, "{}..", start)?;
+                } else if !range.fields.contains_key("start") {
+                    // RangeTo / RangeToInclusive: only "end"/"last" field, emit `..end` or `..=end`
+                    let end_key = if range.fields.contains_key("end") {
+                        "end"
+                    } else {
+                        "last"
+                    };
+                    let end = range.fields.get(end_key).map(String::as_str).unwrap_or("0");
+                    write!(self.ser.output, "{}{}", sep, end)?;
+                } else {
+                    // Range / RangeInclusive: both "start" and "end"/"last"
+                    let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
+                    let end_key = if range.fields.contains_key("end") {
+                        "end"
+                    } else {
+                        "last"
+                    };
+                    let end = range.fields.get(end_key).map(String::as_str).unwrap_or("0");
+                    write!(self.ser.output, "{}{}{}", start, sep, end)?;
+                }
+                return Ok(());
+            }
+            // fallback: close the struct normally (end_indent + ')' handled below)
         }
 
         if let State::Rest = self.state {
