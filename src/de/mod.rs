@@ -1016,6 +1016,12 @@ impl<'de> de::MapAccess<'de> for RangeFromMapAccess {
     }
 
     fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
+        if self.done {
+            return Err(Error::ExpectedDifferentLength {
+                expected: String::from("map of length 1"),
+                found: 2,
+            });
+        }
         self.done = true;
         seed.deserialize(NumberDeserializer(self.start))
     }
@@ -1049,6 +1055,12 @@ impl<'de> de::MapAccess<'de> for RangeToMapAccess {
     }
 
     fn next_value_seed<V: de::DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value> {
+        if self.done {
+            return Err(Error::ExpectedDifferentLength {
+                expected: String::from("map of length 1"),
+                found: 2,
+            });
+        }
         self.done = true;
         seed.deserialize(NumberDeserializer(self.end))
     }

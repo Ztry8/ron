@@ -15,7 +15,6 @@ struct RangeToInclusive<T> {
 #[serde(remote = "std::ops::RangeFull")]
 struct RangeFull;
 
-
 #[derive(PartialEq, Deserialize, Serialize, Debug)]
 struct RangeTest {
     a: std::ops::Range<i32>,
@@ -123,7 +122,7 @@ fn test_unclosed_ranges() {
         c: ..=3,
         d: 1.5..,
         e: ..2.3,
-        f:..=2.3,
+        f: ..=2.3,
         g: ..,
     };
 
