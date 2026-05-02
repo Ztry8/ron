@@ -831,12 +831,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
                         if inclusive && name == "Range" {
                             return Err(Error::Message(String::from(
-                                "expected `..` for Range, found `..=`",
+                                "expected `..` for `Range`, found `..=`",
                             )));
                         }
                         if !inclusive && name == "RangeInclusive" {
                             return Err(Error::Message(String::from(
-                                "expected `..=` for RangeInclusive, found `..`",
+                                "expected `..=` for `RangeInclusive`, found `..`",
                             )));
                         }
 
@@ -872,7 +872,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             if let Some(start) = float_ident {
                 if self.parser.consume_str("..=") {
                     return Err(Error::Message(String::from(
-                        "expected `..` for RangeFrom, found `..=`",
+                        "expected `..` for `RangeFrom`, found `..=`",
                     )));
                 } else if !self.parser.consume_str("..") {
                     return Err(Error::ExpectedRangeSyntax);
@@ -885,7 +885,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     let start = self.parser.any_number()?;
                     if self.parser.consume_str("..=") {
                         return Err(Error::Message(String::from(
-                            "expected `..` for RangeFrom, found `..=`",
+                            "expected `..` for `RangeFrom`, found `..=`",
                         )));
                     } else if !self.parser.consume_str("..") {
                         return Err(Error::ExpectedRangeSyntax);
@@ -899,7 +899,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             if self.parser.check_str("..=") || self.parser.check_str("..") {
                 if self.parser.consume_str("..=") {
                     return Err(Error::Message(String::from(
-                        "expected `..` for RangeTo, found `..=`",
+                        "expected `..` for `RangeTo`, found `..=`",
                     )));
                 }
                 self.parser.consume_str("..");
@@ -913,7 +913,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 if !self.parser.consume_str("..=") {
                     self.parser.consume_str("..");
                     return Err(Error::Message(String::from(
-                        "expected `..=` for RangeToInclusive, found `..`",
+                        "expected `..=` for `RangeToInclusive`, found `..`",
                     )));
                 }
                 let end = self.parser.any_number()?;
