@@ -79,6 +79,15 @@ fn test_range_integer_bases() {
         ron::from_str::<std::ops::RangeInclusive<u8>>("b'A'..=b'Z'").unwrap(),
         b'A'..=b'Z'
     );
+
+    assert_eq!(
+        ron::from_str::<std::ops::RangeTo<u8>>("..0b0101").unwrap(),
+        ..5
+    );
+    assert_eq!(
+        ron::from_str::<std::ops::RangeFrom<u8>>("0b0000..").unwrap(),
+        0..
+    );
 }
 
 #[derive(PartialEq, Deserialize, Serialize, Debug)]
