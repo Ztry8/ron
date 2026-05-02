@@ -164,3 +164,26 @@ fn test_string_range() {
     assert!(ron::from_str::<std::ops::Range<&str>>("\"x\"..\"h\"").is_err());
     assert!(ron::from_str::<std::ops::Range<i32>>("\"x\"..\"h\"").is_err());
 }
+
+#[test]
+fn test_inf_nan_ranges() {
+    let r = ron::from_str::<std::ops::RangeFrom<f32>>("inff32..").unwrap();
+    assert!(r.start.is_infinite() && r.start.is_sign_positive());
+
+    let r = ron::from_str::<std::ops::RangeFrom<f32>>("NaNf32..").unwrap();
+    assert!(r.start.is_nan());
+
+    let r = ron::from_str::<std::ops::RangeFrom<f64>>("inff64..").unwrap();
+    assert!(r.start.is_infinite() && r.start.is_sign_positive());
+
+    let r = ron::from_str::<std::ops::RangeFrom<f64>>("NaNf64..").unwrap();
+    assert!(r.start.is_nan());
+
+    let r = ron::from_str::<std::ops::Range<f32>>("(start:inf,end:NaN)").unwrap();
+    assert!(r.start.is_infinite() && r.start.is_sign_positive());
+    assert!(r.end.is_nan());
+
+    let r = ron::from_str::<std::ops::RangeInclusive<f32>>("(start:NaN,end:inf)").unwrap();
+    assert!(r.start().is_nan());
+    assert!(r.end().is_infinite());
+}
