@@ -768,7 +768,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
                     if inclusive && name == "Range" {
                         return Err(Error::Message(String::from(
-                            "expected `..` for Range, found `..=`",
+                            "expected `..` for `Range`, found `..=`",
                         )));
                     }
                     if !inclusive && name == "RangeInclusive" {
