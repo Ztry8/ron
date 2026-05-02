@@ -801,20 +801,23 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
 
-        if fields == ["end"] && (name == "RangeTo" || name == "RangeToInclusive") {
+        if fields == ["end"] && name == "RangeTo" {
             if self.parser.check_str("..=") || self.parser.check_str("..") {
-                let inclusive = if self.parser.consume_str("..=") {
-                    true
-                } else {
-                    self.parser.consume_str("..");
-                    false
-                };
-                if inclusive && name == "RangeTo" {
+                if self.parser.consume_str("..=") {
                     return Err(Error::Message(String::from(
                         "expected `..` for RangeTo, found `..=`",
                     )));
                 }
-                if !inclusive && name == "RangeToInclusive" {
+                self.parser.consume_str("..");
+                let end = self.parser.any_number()?;
+                return visitor.visit_map(RangeToMapAccess::new(end, "end"));
+            }
+        }
+
+        if matches!(fields, ["end"] | ["last"]) && name == "RangeToInclusive" {
+            if self.parser.check_str("..=") || self.parser.check_str("..") {
+                if !self.parser.consume_str("..=") {
+                    self.parser.consume_str("..");
                     return Err(Error::Message(String::from(
                         "expected `..=` for RangeToInclusive, found `..`",
                     )));
