@@ -57,7 +57,7 @@ GameConfig( // optional struct name
 * Lists: `["abc", "def"]`
 * Structs: `( foo: 1.0, bar: ( baz: "I'm nested" ) )`
 * Maps: `{ "arbitrary": "keys", "are": "allowed" }`
-* Ranges: `3..5`, `-2..=7`, `..10`, `-15..`
+* Ranges: `3..5`, `-2.1..=7.3`, `..-15`, `..10.5`, `..=13`, `..`
 
 > **Note:** Serde's data model represents fixed-size Rust arrays as tuple (instead of as list)
 
