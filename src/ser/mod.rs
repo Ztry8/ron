@@ -1208,8 +1208,8 @@ enum RangeKind {
 
 struct RangeCompound {
     kind: RangeKind,
-    first: Option<String>,
-    second: Option<String>,
+    first: Option<crate::value::Number>,
+    second: Option<crate::value::Number>,
     fallback: bool,
 }
 
@@ -1225,110 +1225,102 @@ impl RangeCompound {
 
     /// Try to serialize `value` as a number into a String buffer.
     /// Returns `Some(s)` if numeric, `None` otherwise.
-    fn try_serialize_number<T: ?Sized + Serialize>(value: &T) -> Option<String> {
+    fn try_serialize_number<T: ?Sized + Serialize>(value: &T) -> Option<crate::value::Number> {
         struct NumberSerializer;
 
         impl ser::Serializer for NumberSerializer {
-            type Ok = String;
+            type Ok = crate::value::Number;
             type Error = Error;
-            type SerializeSeq = ser::Impossible<String, Error>;
-            type SerializeTuple = ser::Impossible<String, Error>;
-            type SerializeTupleStruct = ser::Impossible<String, Error>;
-            type SerializeTupleVariant = ser::Impossible<String, Error>;
-            type SerializeMap = ser::Impossible<String, Error>;
-            type SerializeStruct = ser::Impossible<String, Error>;
-            type SerializeStructVariant = ser::Impossible<String, Error>;
+            type SerializeSeq = ser::Impossible<crate::value::Number, Error>;
+            type SerializeTuple = ser::Impossible<crate::value::Number, Error>;
+            type SerializeTupleStruct = ser::Impossible<crate::value::Number, Error>;
+            type SerializeTupleVariant = ser::Impossible<crate::value::Number, Error>;
+            type SerializeMap = ser::Impossible<crate::value::Number, Error>;
+            type SerializeStruct = ser::Impossible<crate::value::Number, Error>;
+            type SerializeStructVariant = ser::Impossible<crate::value::Number, Error>;
 
-            fn serialize_i8(self, v: i8) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_i8(self, v: i8) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_i16(self, v: i16) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_i16(self, v: i16) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_i32(self, v: i32) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_i32(self, v: i32) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_i64(self, v: i64) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_i64(self, v: i64) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_u8(self, v: u8) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_u8(self, v: u8) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_u16(self, v: u16) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_u16(self, v: u16) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_u32(self, v: u32) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_u32(self, v: u32) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_u64(self, v: u64) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_u64(self, v: u64) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_f32(self, v: f32) -> Result<String> {
-                let mut s = v.to_string();
-                if v % 1. == 0.0 {
-                    s.push_str(".0");
-                }
-                Ok(s)
+            fn serialize_f32(self, v: f32) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
-            fn serialize_f64(self, v: f64) -> Result<String> {
-                let mut s = v.to_string();
-                if v % 1. == 0.0 {
-                    s.push_str(".0");
-                }
-                Ok(s)
+            fn serialize_f64(self, v: f64) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
             #[cfg(feature = "integer128")]
-            fn serialize_i128(self, v: i128) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_i128(self, v: i128) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
             #[cfg(feature = "integer128")]
-            fn serialize_u128(self, v: u128) -> Result<String> {
-                Ok(v.to_string())
+            fn serialize_u128(self, v: u128) -> Result<crate::value::Number> {
+                Ok(crate::value::Number::new(v))
             }
 
-            fn serialize_bool(self, _: bool) -> Result<String> {
+            fn serialize_bool(self, _: bool) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("bool"),
                 })
             }
-            fn serialize_char(self, _: char) -> Result<String> {
+            fn serialize_char(self, _: char) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("char"),
                 })
             }
-            fn serialize_str(self, _: &str) -> Result<String> {
+            fn serialize_str(self, _: &str) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("string"),
                 })
             }
-            fn serialize_bytes(self, _: &[u8]) -> Result<String> {
+            fn serialize_bytes(self, _: &[u8]) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("bytes"),
                 })
             }
-            fn serialize_none(self) -> Result<String> {
+            fn serialize_none(self) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("None"),
                 })
             }
-            fn serialize_some<T: ?Sized + Serialize>(self, _: &T) -> Result<String> {
+            fn serialize_some<T: ?Sized + Serialize>(self, _: &T) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("Some"),
                 })
             }
-            fn serialize_unit(self) -> Result<String> {
+            fn serialize_unit(self) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("unit"),
                 })
             }
-            fn serialize_unit_struct(self, _: &'static str) -> Result<String> {
+            fn serialize_unit_struct(self, _: &'static str) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("unit struct"),
@@ -1339,7 +1331,7 @@ impl RangeCompound {
                 _: &'static str,
                 _: u32,
                 _: &'static str,
-            ) -> Result<String> {
+            ) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("unit variant"),
@@ -1349,7 +1341,7 @@ impl RangeCompound {
                 self,
                 _: &'static str,
                 _: &T,
-            ) -> Result<String> {
+            ) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("newtype struct"),
@@ -1361,7 +1353,7 @@ impl RangeCompound {
                 _: u32,
                 _: &'static str,
                 _: &T,
-            ) -> Result<String> {
+            ) -> Result<crate::value::Number> {
                 Err(Error::InvalidValueForType {
                     expected: String::from("number"),
                     found: String::from("newtype variant"),
@@ -1679,7 +1671,7 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
                 };
 
                 // Collect buffered values before the mutable borrow below
-                let buffered: [Option<(&'static str, String)>; 2] = [
+                let buffered: [Option<(&'static str, crate::value::Number)>; 2] = [
                     range.first.take().map(|v| (first_key, v)),
                     range.second.take().map(|v| ("end", v)),
                 ];
@@ -1754,8 +1746,8 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
         Ok(())
     }
 
-    fn end(self) -> Result<()> {
-        if let Some(ref range) = self.range {
+    fn end(mut self) -> Result<()> {
+        if let Some(ref mut range) = self.range {
             if !range.fallback {
                 // All fields were numeric — emit compact syntax
                 let sep = match range.kind {
@@ -1765,17 +1757,25 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
 
                 match range.kind {
                     RangeKind::RangeFrom => {
-                        let start = range.first.as_deref().unwrap_or("0");
-                        write!(self.ser.output, "{}..", start)?;
+                        if let Some(start) = range.first.take() {
+                            start.serialize(&mut *self.ser)?;
+                        }
+                        self.ser.output.write_str("..")?;
                     }
                     RangeKind::RangeTo | RangeKind::RangeToInclusive => {
-                        let end = range.first.as_deref().unwrap_or("0");
-                        write!(self.ser.output, "{}{}", sep, end)?;
+                        self.ser.output.write_str(sep)?;
+                        if let Some(end) = range.first.take() {
+                            end.serialize(&mut *self.ser)?;
+                        }
                     }
                     RangeKind::Range | RangeKind::RangeInclusive => {
-                        let start = range.first.as_deref().unwrap_or("0");
-                        let end = range.second.as_deref().unwrap_or("0");
-                        write!(self.ser.output, "{}{}{}", start, sep, end)?;
+                        if let Some(start) = range.first.take() {
+                            start.serialize(&mut *self.ser)?;
+                        }
+                        self.ser.output.write_str(sep)?;
+                        if let Some(end) = range.second.take() {
+                            end.serialize(&mut *self.ser)?;
+                        }
                     }
                 }
                 return Ok(());
