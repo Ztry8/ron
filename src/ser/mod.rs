@@ -1667,36 +1667,26 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
                         range.fallback = true;
                     }
                 }
-                // fallback: emit normal struct header and any buffered fields
+                self.ser.output.write_char('(')?;
                 if !self.ser.compact_structs() {
-                    self.ser.output.write_char('(')?;
-                    self.ser.output.write_char('\n')?;
+                    self.ser.is_empty = Some(false);
+                    self.ser.start_indent()?;
                 }
-                // The first field is always "start" for Range/RangeFrom, "end" for RangeTo/RangeToInclusive
+
                 let first_key = match range.kind {
                     RangeKind::RangeTo | RangeKind::RangeToInclusive => "end",
                     _ => "start",
                 };
-                for (bkey, bval) in [
-                    range.first.as_deref().map(|v| (first_key, v)),
-                    range.second.as_deref().map(|v| ("end", v)),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    if !self.ser.compact_structs() {
-                        self.ser.indent()?;
-                    }
-                    self.ser.write_identifier(bkey)?;
-                    self.ser.output.write_char(':')?;
-                    if let Some((ref config, _)) = self.ser.pretty {
-                        self.ser.output.write_str(&config.separator)?;
-                    }
-                    self.ser.output.write_str(bval)?;
-                    self.ser.output.write_char(',')?;
-                    if let Some((ref config, _)) = self.ser.pretty {
-                        self.ser.output.write_str(&config.new_line)?;
-                    }
+
+                // Collect buffered values before the mutable borrow below
+                let buffered: [Option<(&'static str, String)>; 2] = [
+                    range.first.take().map(|v| (first_key, v)),
+                    range.second.take().map(|v| ("end", v)),
+                ];
+
+                let _ = drop(range); // release borrow of self.range
+                for (bkey, bval) in buffered.into_iter().flatten() {
+                    ser::SerializeStruct::serialize_field(self, bkey, &bval)?;
                 }
                 // fall through to emit the current non-numeric field normally
             }
