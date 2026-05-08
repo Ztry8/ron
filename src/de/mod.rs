@@ -812,40 +812,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
 
         if fields == ["start"] && name == "RangeFrom" {
-            let float_ident = if self.parser.check_ident("inf") || self.parser.check_ident("inff32")
-            {
-                self.parser.skip_identifier();
-                Some(crate::value::Number::F32(crate::value::F32(
-                    core::f32::INFINITY,
-                )))
-            } else if self.parser.check_ident("inff64") {
-                self.parser.skip_identifier();
-                Some(crate::value::Number::F64(crate::value::F64(
-                    core::f64::INFINITY,
-                )))
-            } else if self.parser.check_ident("NaN") || self.parser.check_ident("NaNf32") {
-                self.parser.skip_identifier();
-                Some(crate::value::Number::F32(crate::value::F32(core::f32::NAN)))
-            } else if self.parser.check_ident("NaNf64") {
-                self.parser.skip_identifier();
-                Some(crate::value::Number::F64(crate::value::F64(core::f64::NAN)))
-            } else {
-                None
-            };
-
-            if let Some(start) = float_ident {
-                if self.parser.consume_str("..=") {
-                    return Err(Error::Message(String::from(
-                        "expected `..` for `RangeFrom`, found `..=`",
-                    )));
-                } else if !self.parser.consume_str("..") {
-                    return Err(Error::ExpectedRangeSyntax);
-                }
-                return visitor.visit_map(RangeFromMapAccess::new(start));
-            }
-
             if let Some(c) = self.parser.peek_char() {
-                if self.parser.is_number_start(c) {
+                if self.parser.is_number_start(c)
+                    || self.parser.check_ident("inf")
+                    || self.parser.check_ident("inff32")
+                    || self.parser.check_ident("inff64")
+                    || self.parser.check_ident("NaN")
+                    || self.parser.check_ident("NaNf32")
+                    || self.parser.check_ident("NaNf64")
+                {
                     let start = self.parser.any_number()?;
                     if self.parser.consume_str("..=") {
                         return Err(Error::Message(String::from(

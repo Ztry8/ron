@@ -465,6 +465,16 @@ impl<'a> Parser<'a> {
     }
 
     pub fn any_number(&mut self) -> Result<Number> {
+        if self.consume_ident("inf") || self.consume_ident("inff32") {
+            return Ok(Number::F32(crate::value::F32(core::f32::INFINITY).into()));
+        } else if self.consume_ident("inff64") {
+            return Ok(Number::F64(crate::value::F64(core::f64::INFINITY).into()));
+        } else if self.consume_ident("NaN") || self.consume_ident("NaNf32") {
+            return Ok(Number::F32(crate::value::F32(core::f32::NAN).into()));
+        } else if self.consume_ident("NaNf64") {
+            return Ok(Number::F64(crate::value::F64(core::f64::NAN).into()));
+        }
+
         if self.next_bytes_is_float() {
             return match self.float::<ParsedFloat>()? {
                 ParsedFloat::F32(v) => Ok(Number::F32(v.into())),
