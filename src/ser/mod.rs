@@ -374,10 +374,6 @@ impl PrettyConfig {
     /// # ;
     /// ```
     ///
-    /// Note: this option only produces correct output when the range bounds
-    /// are numeric types. Non-numeric bounds will serialize but cannot be
-    /// deserialized back.
-    ///
     /// Default: `false`
     #[must_use]
     pub fn compact_ranges(mut self, compact_ranges: bool) -> Self {

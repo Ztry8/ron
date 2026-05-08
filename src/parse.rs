@@ -144,6 +144,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn is_number_start(&self, c: char) -> bool {
+        matches!(c, '0'..='9' | '+' | '-' | '.' | 'b') && (c != 'b' || self.src().starts_with("b'"))
+    }
+
     pub fn advance_bytes(&mut self, bytes: usize) {
         self.prev_cursor = self.cursor;
         self.cursor.cursor += bytes;
