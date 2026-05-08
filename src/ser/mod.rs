@@ -1103,8 +1103,17 @@ impl<'a, W: fmt::Write> ser::Serializer for &'a mut Serializer<W> {
             self.implicit_some_depth = 0;
             return Ok(Compound::new_range(
                 self,
-                name == "RangeInclusive" || name == "RangeToInclusive",
-                name == "RangeFrom",
+                if name == "RangeInclusive" {
+                    RangeKind::RangeInclusive
+                } else if name == "RangeFrom" {
+                    RangeKind::RangeFrom
+                } else if name == "RangeTo" {
+                    RangeKind::RangeTo
+                } else if name == "RangeToInclusive" {
+                    RangeKind::RangeToInclusive
+                } else {
+                    RangeKind::Range
+                },
             ));
         }
 
@@ -1178,31 +1187,35 @@ impl<'a, W: fmt::Write> Compound<'a, W> {
         }
     }
 
-    fn new_range(ser: &'a mut Serializer<W>, inclusive: bool, range_from: bool) -> Self {
+    fn new_range(ser: &'a mut Serializer<W>, kind: RangeKind) -> Self {
         Compound {
             ser,
             state: State::First,
             newtype_variant: false,
             sequence_index: 0,
-            range: Some(RangeCompound::new(inclusive, range_from)),
+            range: Some(RangeCompound::new(kind)),
         }
     }
 }
 
+enum RangeKind {
+    Range,
+    RangeInclusive,
+    RangeFrom,
+    RangeTo,
+    RangeToInclusive,
+}
+
 struct RangeCompound {
-    inclusive: bool,
-    range_from: bool,
-    /// Buffered fields: key → serialized string (only if numeric)
+    kind: RangeKind,
     fields: alloc::collections::BTreeMap<&'static str, String>,
-    /// Set to true if any field was found to be non-numeric
     fallback: bool,
 }
 
 impl RangeCompound {
-    fn new(inclusive: bool, range_from: bool) -> Self {
+    fn new(kind: RangeKind) -> Self {
         RangeCompound {
-            inclusive,
-            range_from,
+            kind,
             fields: alloc::collections::BTreeMap::new(),
             fallback: false,
         }
@@ -1741,30 +1754,29 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
         if let Some(ref range) = self.range {
             if !range.fallback {
                 // All fields were numeric — emit compact syntax
-                let sep = if range.inclusive { "..=" } else { ".." };
-                if range.range_from {
-                    // RangeFrom: only "start" field, emit `start..`
-                    let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
-                    write!(self.ser.output, "{}..", start)?;
-                } else if !range.fields.contains_key("start") {
-                    // RangeTo / RangeToInclusive: only "end"/"last" field, emit `..end` or `..=end`
-                    let end_key = if range.fields.contains_key("end") {
-                        "end"
-                    } else {
-                        "last"
-                    };
-                    let end = range.fields.get(end_key).map(String::as_str).unwrap_or("0");
-                    write!(self.ser.output, "{}{}", sep, end)?;
-                } else {
-                    // Range / RangeInclusive: both "start" and "end"/"last"
-                    let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
-                    let end_key = if range.fields.contains_key("end") {
-                        "end"
-                    } else {
-                        "last"
-                    };
-                    let end = range.fields.get(end_key).map(String::as_str).unwrap_or("0");
-                    write!(self.ser.output, "{}{}{}", start, sep, end)?;
+                let sep = match range.kind {
+                    RangeKind::RangeInclusive | RangeKind::RangeToInclusive => "..=",
+                    _ => "..",
+                };
+
+                match range.kind {
+                    RangeKind::RangeFrom => {
+                        let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
+                        write!(self.ser.output, "{}..", start)?;
+                    }
+                    RangeKind::RangeTo => {
+                        let end = range.fields.get("end").map(String::as_str).unwrap_or("0");
+                        write!(self.ser.output, "{}{}", sep, end)?;
+                    }
+                    RangeKind::RangeToInclusive => {
+                        let end = range.fields.get("end").map(String::as_str).unwrap_or("0");
+                        write!(self.ser.output, "{}{}", sep, end)?;
+                    }
+                    RangeKind::Range | RangeKind::RangeInclusive => {
+                        let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
+                        let end = range.fields.get("end").map(String::as_str).unwrap_or("0");
+                        write!(self.ser.output, "{}{}{}", start, sep, end)?;
+                    }
                 }
                 return Ok(());
             }
