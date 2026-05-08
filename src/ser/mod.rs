@@ -1208,7 +1208,8 @@ enum RangeKind {
 
 struct RangeCompound {
     kind: RangeKind,
-    fields: alloc::collections::BTreeMap<&'static str, String>,
+    first: Option<String>,
+    second: Option<String>,
     fallback: bool,
 }
 
@@ -1216,7 +1217,8 @@ impl RangeCompound {
     fn new(kind: RangeKind) -> Self {
         RangeCompound {
             kind,
-            fields: alloc::collections::BTreeMap::new(),
+            first: None,
+            second: None,
             fallback: false,
         }
     }
@@ -1654,22 +1656,34 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
             if !range.fallback {
                 match RangeCompound::try_serialize_number(value) {
                     Some(s) => {
-                        range.fields.insert(key, s);
+                        if range.first.is_none() {
+                            range.first = Some(s);
+                        } else {
+                            range.second = Some(s);
+                        }
+                        return Ok(());
                     }
                     None => {
                         range.fallback = true;
                     }
                 }
-                if !range.fallback {
-                    return Ok(());
-                }
-                // fallback: emit normal struct header and all buffered fields so far
+                // fallback: emit normal struct header and any buffered fields
                 if !self.ser.compact_structs() {
                     self.ser.output.write_char('(')?;
-                    self.ser.output.write_char('\n')?; // start_indent equivalent
+                    self.ser.output.write_char('\n')?;
                 }
-                let buffered: alloc::vec::Vec<_> = range.fields.iter().collect();
-                for (bkey, bval) in &buffered {
+                // The first field is always "start" for Range/RangeFrom, "end" for RangeTo/RangeToInclusive
+                let first_key = match range.kind {
+                    RangeKind::RangeTo | RangeKind::RangeToInclusive => "end",
+                    _ => "start",
+                };
+                for (bkey, bval) in [
+                    range.first.as_deref().map(|v| (first_key, v)),
+                    range.second.as_deref().map(|v| ("end", v)),
+                ]
+                .into_iter()
+                .flatten()
+                {
                     if !self.ser.compact_structs() {
                         self.ser.indent()?;
                     }
@@ -1684,7 +1698,7 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
                         self.ser.output.write_str(&config.new_line)?;
                     }
                 }
-                // now fall through to emit the current non-numeric field normally below
+                // fall through to emit the current non-numeric field normally
             }
         }
 
@@ -1761,20 +1775,16 @@ impl<'a, W: fmt::Write> ser::SerializeStruct for Compound<'a, W> {
 
                 match range.kind {
                     RangeKind::RangeFrom => {
-                        let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
+                        let start = range.first.as_deref().unwrap_or("0");
                         write!(self.ser.output, "{}..", start)?;
                     }
-                    RangeKind::RangeTo => {
-                        let end = range.fields.get("end").map(String::as_str).unwrap_or("0");
-                        write!(self.ser.output, "{}{}", sep, end)?;
-                    }
-                    RangeKind::RangeToInclusive => {
-                        let end = range.fields.get("end").map(String::as_str).unwrap_or("0");
+                    RangeKind::RangeTo | RangeKind::RangeToInclusive => {
+                        let end = range.first.as_deref().unwrap_or("0");
                         write!(self.ser.output, "{}{}", sep, end)?;
                     }
                     RangeKind::Range | RangeKind::RangeInclusive => {
-                        let start = range.fields.get("start").map(String::as_str).unwrap_or("0");
-                        let end = range.fields.get("end").map(String::as_str).unwrap_or("0");
+                        let start = range.first.as_deref().unwrap_or("0");
+                        let end = range.second.as_deref().unwrap_or("0");
                         write!(self.ser.output, "{}{}{}", start, sep, end)?;
                     }
                 }
