@@ -1,6 +1,5 @@
 use alloc::{borrow::Cow, string::String};
 use core::fmt;
-use std::string::ToString;
 
 use serde::{ser, ser::Serialize};
 use serde_derive::{Deserialize, Serialize};
