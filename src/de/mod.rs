@@ -233,6 +233,31 @@ impl<'de> Deserializer<'de> {
         }
     }
 
+    fn handle_float_range_or_value<V>(
+        &mut self,
+        number: crate::value::Number,
+        visitor: V,
+    ) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        if self.parser.consume_str("..=") {
+            let end = self.parser.any_number()?;
+            return visitor.visit_map(RangeMapAccess::new(number, end, "end"));
+        } else if self.parser.consume_str("..") {
+            if self
+                .parser
+                .peek_char()
+                .map_or(true, |c| !self.parser.is_number_start(c))
+            {
+                return visitor.visit_map(RangeFromMapAccess::new(number));
+            }
+            let end = self.parser.any_number()?;
+            return visitor.visit_map(RangeMapAccess::new(number, end, "end"));
+        }
+        number.visit(visitor)
+    }
+
     /// Called from
     /// [`deserialize_struct`][serde::Deserializer::deserialize_struct],
     /// [`struct_variant`][serde::de::VariantAccess::struct_variant], and
@@ -330,73 +355,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         } else if self.parser.consume_str("()") {
             return visitor.visit_unit();
         } else if self.parser.consume_ident("inf") || self.parser.consume_ident("inff32") {
-            let start = crate::value::Number::F32(crate::value::F32(core::f32::INFINITY));
-            if self.parser.consume_str("..=") {
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            } else if self.parser.consume_str("..") {
-                if self
-                    .parser
-                    .peek_char()
-                    .map_or(true, |c| !self.parser.is_number_start(c))
-                {
-                    return visitor.visit_map(RangeFromMapAccess::new(start));
-                }
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            }
-            return visitor.visit_f32(core::f32::INFINITY);
+            let number = crate::value::Number::F32(crate::value::F32(core::f32::INFINITY));
+            return self.handle_float_range_or_value(number, visitor);
         } else if self.parser.consume_ident("inff64") {
-            let start = crate::value::Number::F64(crate::value::F64(core::f64::INFINITY));
-            if self.parser.consume_str("..=") {
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            } else if self.parser.consume_str("..") {
-                if self
-                    .parser
-                    .peek_char()
-                    .map_or(true, |c| !self.parser.is_number_start(c))
-                {
-                    return visitor.visit_map(RangeFromMapAccess::new(start));
-                }
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            }
-            return visitor.visit_f64(core::f64::INFINITY);
+            let number = crate::value::Number::F64(crate::value::F64(core::f64::INFINITY));
+            return self.handle_float_range_or_value(number, visitor);
         } else if self.parser.consume_ident("NaN") || self.parser.consume_ident("NaNf32") {
-            let start = crate::value::Number::F32(crate::value::F32(core::f32::NAN));
-            if self.parser.consume_str("..=") {
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            } else if self.parser.consume_str("..") {
-                if self
-                    .parser
-                    .peek_char()
-                    .map_or(true, |c| !self.parser.is_number_start(c))
-                {
-                    return visitor.visit_map(RangeFromMapAccess::new(start));
-                }
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            }
-            return visitor.visit_f32(core::f32::NAN);
+            let number = crate::value::Number::F32(crate::value::F32(core::f32::NAN));
+            return self.handle_float_range_or_value(number, visitor);
         } else if self.parser.consume_ident("NaNf64") {
-            let start = crate::value::Number::F64(crate::value::F64(core::f64::NAN));
-            if self.parser.consume_str("..=") {
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            } else if self.parser.consume_str("..") {
-                if self
-                    .parser
-                    .peek_char()
-                    .map_or(true, |c| !self.parser.is_number_start(c))
-                {
-                    return visitor.visit_map(RangeFromMapAccess::new(start));
-                }
-                let end = self.parser.any_number()?;
-                return visitor.visit_map(RangeMapAccess::new(start, end, "end"));
-            }
-            return visitor.visit_f64(core::f64::NAN);
+            let number = crate::value::Number::F64(crate::value::F64(core::f64::NAN));
+            return self.handle_float_range_or_value(number, visitor);
         }
 
         // `skip_identifier` does not change state if it fails
